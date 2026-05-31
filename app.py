@@ -75,7 +75,7 @@ def get_mega_stock_database():
         {"ticker": "M&M.NS", "name": "Mahindra & Mahindra", "industry": "Automobiles & EV", "cap": "Large Cap"},
         {"ticker": "MARUTI.NS", "name": "Maruti Suzuki", "industry": "Automobiles & EV", "cap": "Large Cap"},
         {"ticker": "TVSMOTOR.NS", "name": "TVS Motor", "industry": "Automobiles & EV", "cap": "Large Cap"},
-        {"ticker": "BALAMRINA.NS", "name": "Amara Raja Energy", "industry": "Automobiles & EV", "cap": "Mid Cap"},
+        {"ticker": "AMARAJABAT.NS", "name": "Amara Raja Energy", "industry": "Automobiles & EV", "cap": "Mid Cap"},
         {"ticker": "OLECTRA.NS", "name": "Olectra Greentech", "industry": "Automobiles & EV", "cap": "Small Cap"},
         
         # --- PHARMA & HEALTHCARE ---
@@ -100,8 +100,6 @@ def get_mega_stock_database():
 # 2. Advanced Multi-Day Volume Engine
 def fetch_multiday_volume(df_db, lookback_days):
     tickers = df_db['ticker'].tolist()
-    
-    # Extra buffer period for moving averages calculation safely
     total_period = "3mo" if lookback_days <= 3 else "6mo"
     
     data = yf.download(tickers, period=total_period, progress=False)
@@ -116,13 +114,9 @@ def fetch_multiday_volume(df_db, lookback_days):
     for _, row in df_db.iterrows():
         t = row['ticker']
         if t in volume_df.columns and len(volume_df[t]) >= (lookback_days + 20):
-            # Sum of active window volume requested by user
             current_window_vol = volume_df[t].iloc[-lookback_days:].sum()
-            
-            # Historical base baseline average for comparison (Previous 20 trading sessions baseline)
             historical_base_avg = volume_df[t].iloc[:-lookback_days].tail(20).mean() * lookback_days
             
-            # Dynamic price shift metrics across chosen window
             price_initial = close_df[t].iloc[-lookback_days - 1]
             price_final = close_df[t].iloc[-1]
             price_delta_pct = ((price_final - price_initial) / price_initial) * 100
@@ -144,7 +138,6 @@ def fetch_multiday_volume(df_db, lookback_days):
 # --- UI Controls Configuration Sidebar ---
 st.sidebar.header("🎯 Scanner Setup")
 
-# Your requested 4 key customizable duration inputs
 lookback_label = st.sidebar.selectbox(
     "Choose Analysis Window", 
     ["Yesterday (1 Day)", "Past 3 Days", "Past 7 Days", "Past 15 Days"]
@@ -178,7 +171,7 @@ if not df_raw_stocks.empty:
     
     industry_stats['Industry_Spike'] = (industry_stats['Total_Current'] / industry_stats['Total_Base']).round(2)
     
-    # CRITICAL REQUEST: Sort industry from Top high volume to low volume spike automatically
+    # Sort industry from Top high volume to low volume spike automatically
     industry_stats = industry_stats.sort_values(by='Industry_Spike', ascending=False).reset_index(drop=True)
     
     st.subheader(f"📊 Live Industry Volume Heatmap ({lookback_label})")
@@ -188,55 +181,46 @@ if not df_raw_stocks.empty:
     for idx, row in industry_stats.iterrows():
         spike = row['Industry_Spike']
         
-        # HEATMAP COLOR DESIGN LOGIC (Green for high spike, Red/Grey for normal or low)
+        # HEATMAP COLOR DESIGN LOGIC
         if spike >= 2.0:
-            bg_color = "#1E4620"   # Dark Forest Green for heavy institutional buy
+            bg_color = "#1E4620"   # Dark Forest Green
             text_color = "#2ECC71"
             status_badge = "🟢 BLOCKBUSTER ACCUMULATION"
         elif spike >= 1.3:
-            bg_color = "#2D5A27"   # Olive/Medium Green for positive steady accumulation
+            bg_color = "#2D5A27"   # Olive Green
             text_color = "#A9DFBF"
             status_badge = "🟩 HEAVY BUYING"
         elif spike >= 0.9:
-            bg_color = "#4A4A4A"   # Dark Grey/Neutral for normal steady churn
+            bg_color = "#4A4A4A"   # Dark Grey
             text_color = "#E5E7E9"
             status_badge = "⬜ NORMAL CHURN"
         else:
-            bg_color = "#641E16"   # Deep Crimson/Muted Red for dry volume/outflow sectors
+            bg_color = "#641E16"   # Deep Crimson/Muted Red
             text_color = "#F5B7B1"
             status_badge = "🚨 VOLUME DRY / DRIFTING"
 
-        # Expandable header designed as custom colorful strip block
         custom_header = f"⚡ #{idx+1} {row['industry'].upper()}  ➔  Spike: {spike}x  |  Avg Returns: {row['Avg_Price_Chg']:.2f}%  |  [{status_badge}]"
         
-        # Inject styled markdown block component box layout container
         with st.expander(custom_header):
             st.markdown(
                 f"<div style='background-color:{bg_color}; padding:12px; border-radius:6px; margin-bottom:10px;'>"
                 f"<span style='color:{text_color}; font-weight:bold;'>Heatmap Insights:</span> "
                 f"This segment processed {spike}x relative volume benchmarking baseline settings. "
                 f"</div>", 
-                unsafe_html=True
+                unsafe_allow_html=True
             )
             
-            # Filter and gather internal constituent items
             constituent_stocks = df_raw_stocks[df_raw_stocks['industry'] == row['industry']].copy()
-            
-            # CRITICAL REQUEST: Sort internal stocks inside the sector from high-to-low volume spike automatically
             constituent_stocks = constituent_stocks.sort_values(by='volume_spike', ascending=False)
             
-            # Polish columns structure presentation layer
             ui_table = constituent_stocks[['name', 'ticker', 'cap', 'volume_spike', 'price_change_%']].copy()
             ui_table.columns = ['Stock Name', 'Ticker Code', 'Market Cap Class', 'Volume Spike Factor', 'Price Shift Percentage']
             
-            # --- Is Sahi Code Se Replace Kar Dein ---
-with st.expander(custom_header):
-    st.markdown(
-        f"<div style='background-color:{bg_color}; padding:12px; border-radius:6px; margin-bottom:10px;'>"
-        f"<span style='color:{text_color}; font-weight:bold;'>Heatmap Insights:</span> "
-        f"This segment processed {spike}x relative volume benchmarking baseline settings. "
-        f"</div>", 
-        unsafe_allow_html=True  # <--- Yeh bilkul sahi hai
-    )
+            st.dataframe(
+                ui_table.style.background_gradient(subset=['Volume Spike Factor'], cmap='Greens' if spike >= 1.3 else 'Reds')
+                             .format({'Price Shift Percentage': '{:.2f}%', 'Volume Spike Factor': '{:.2f}x'}),
+                use_container_width=True,
+                hide_index=True
+            )
 else:
     st.warning("Filters configuration setup mismatch. Please change the Market Cap parameters to refresh calculations.")
