@@ -229,11 +229,14 @@ if not df_raw_stocks.empty:
             ui_table = constituent_stocks[['name', 'ticker', 'cap', 'volume_spike', 'price_change_%']].copy()
             ui_table.columns = ['Stock Name', 'Ticker Code', 'Market Cap Class', 'Volume Spike Factor', 'Price Shift Percentage']
             
-            st.dataframe(
-                ui_table.style.background_gradient(subset=['Volume Spike Factor'], cmap='Greens' if spike >= 1.3 else 'Reds')
-                             .format({'Price Shift Percentage': '{:.2f}%', 'Volume Spike Factor': '{:.2f}x'}),
-                use_container_width=True,
-                hide_index=True
-            )
+            # --- Is Sahi Code Se Replace Kar Dein ---
+with st.expander(custom_header):
+    st.markdown(
+        f"<div style='background-color:{bg_color}; padding:12px; border-radius:6px; margin-bottom:10px;'>"
+        f"<span style='color:{text_color}; font-weight:bold;'>Heatmap Insights:</span> "
+        f"This segment processed {spike}x relative volume benchmarking baseline settings. "
+        f"</div>", 
+        unsafe_allow_html=True  # <--- Yeh bilkul sahi hai
+    )
 else:
     st.warning("Filters configuration setup mismatch. Please change the Market Cap parameters to refresh calculations.")
